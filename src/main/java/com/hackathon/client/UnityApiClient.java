@@ -119,6 +119,19 @@ public class UnityApiClient {
                 if (data != null) {
                     List<Map<?, ?>> loans = (List<Map<?, ?>>) data.get("loans");
                     if (loans != null && !loans.isEmpty()) {
+                        // Prefer ACTIVE loan; fall back to first non-ARCHIVED; last resort: first entry
+                        String fallback = null;
+                        for (Map<?, ?> loan : loans) {
+                            String status = (String) loan.get("status");
+                            String flowId = (String) loan.get("flowId");
+                            if ("ACTIVE".equals(status) && flowId != null) {
+                                return flowId;
+                            }
+                            if (!"ARCHIVED".equals(status) && flowId != null && fallback == null) {
+                                fallback = flowId;
+                            }
+                        }
+                        if (fallback != null) return fallback;
                         return (String) loans.get(0).get("flowId");
                     }
                 }

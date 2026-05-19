@@ -49,6 +49,10 @@ public class UserJourneyController {
         org.springframework.http.HttpEntity<Map<String, Object>> entity = new org.springframework.http.HttpEntity<>(body, headers);
         try {
             ResponseEntity<Object> response = restTemplate.postForEntity(url, entity, Object.class);
+            String pan = (String) body.get("pan");
+            if (pan != null) {
+                ckycFixService.fixCkycUserId(pan);
+            }
             return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
         } catch (org.springframework.web.client.HttpClientErrorException e) {
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());

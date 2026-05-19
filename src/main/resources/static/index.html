@@ -926,49 +926,6 @@
       </div>`;
   }
 
-  // ── Confirm Offer: call Unity staging API directly ──
-  async function callConfirmOffer(pan, authContact, lender, holdings, contacts) {
-    const payload = {
-      pan: pan,
-      testMeta: { lender: lender },
-      productType: 'lamf',
-      authContact: { number: authContact, countryCode: '+91' },
-      smallcaseContext: {
-        broker: 'kite',
-        isInternalUser: true,
-        isSubscribed: false,
-        isInvested: false,
-        analyticsId: 'ct12345678',
-      },
-      ...(contacts.length && { contacts }),
-      assetType: 'MUTUALFUND',
-      holdings: holdings && holdings.length ? holdings : null,
-      holdingsLastFetchedAt: new Date().toISOString(),
-      isLienMarkingMocked: true,
-      age: 24,
-      isNri: false,
-    };
-
-    const res = await fetch('/api/proxy/unity/create-user', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const json = await res.json();
-    if (!res.ok || !json.data) {
-      const msg = json.errors?.[0]?.message || json.message || 'Unity API error';
-      throw new Error(msg);
-    }
-    return {
-      success: true,
-      userId: json.data.unityUserId,
-      loanId: null,
-      journeyStatus: 'CONFIRM_OFFER',
-      lender: json.data.lender || lender,
-    };
-  }
-
   // ── Form submit ──
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
@@ -979,7 +936,6 @@
     const lender      = document.getElementById('lender').value;
     const status      = document.getElementById('journeyStatus').value;
     const holdings    = JSON.parse(document.getElementById('holdings').value.trim());
-    const transactionId = document.getElementById('transactionId').value.trim() || undefined;
     const phones      = getPhoneContacts();
     const emails      = getEmailContacts();
     const contacts    = buildContactsArray(phones, emails);
@@ -992,27 +948,48 @@
     resultEl.innerHTML = '';
 
     try {
-      let data;
-      if (status === 'CONFIRM_OFFER') {
-        data = await callConfirmOffer(pan, authContact, lender, holdings, contacts);
-      } else {
-        const payload = { pan, phone: authContact, lender, journeyStatus: status, holdings };
-        if (transactionId)     payload.transactionId     = transactionId;
-        if (bankAccountNumber) payload.bankAccountNumber = bankAccountNumber;
-        if (ifsc)              payload.ifsc              = ifsc;
+      const payload = {
+        pan,
+        testMeta: { lender },
+        productType: 'lamf',
+        authContact: { number: authContact, countryCode: '+91' },
+        smallcaseContext: {
+          broker: 'kite',
+          isInternalUser: true,
+          isSubscribed: false,
+          isInvested: false,
+          analyticsId: 'ct12345678',
+        },
+        ...(contacts.length && { contacts }),
+        assetType: 'MUTUALFUND',
+        holdings: holdings && holdings.length ? holdings : null,
+        holdingsLastFetchedAt: new Date().toISOString(),
+        isLienMarkingMocked: true,
+        age: 24,
+        isNri: false,
+        ...(bankAccountNumber && { bankAccountNumber }),
+        ...(ifsc && { ifsc }),
+      };
 
-        const res = await fetch('/api/user-journey', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        data = await res.json();
-        if (!res.ok || !data.success) {
-          renderError(data.message || 'Unknown error occurred');
-          return;
-        }
+      const res = await fetch('/api/proxy/unity/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.data) {
+        const msg = json.errors?.[0]?.message || json.message || 'Unity API error';
+        renderError(msg);
+        return;
       }
-      renderSuccess(data);
+      renderSuccess({
+        success: true,
+        userId: json.data.unityUserId,
+        loanId: null,
+        journeyStatus: 'FETCH_CKYC',
+        lender: json.data.lender || lender,
+      });
     } catch (err) {
       renderError('Network error: ' + err.message);
     } finally {

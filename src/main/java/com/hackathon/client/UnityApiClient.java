@@ -106,6 +106,29 @@ public class UnityApiClient {
         return null;
     }
 
+    @SuppressWarnings("unchecked")
+    public String getFlowId(String userId) {
+        String url = baseUrl + "/backend/gatewaydemo-stag/v1/user/" + userId;
+        HttpHeaders headers = buildHeaders();
+        headers.set("X-Forwarded-For", "43.204.178.93");
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Map<?, ?> data = (Map<?, ?>) response.getBody().get("data");
+                if (data != null) {
+                    List<Map<?, ?>> loans = (List<Map<?, ?>>) data.get("loans");
+                    if (loans != null && !loans.isEmpty()) {
+                        return (String) loans.get(0).get("flowId");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // best-effort
+        }
+        return null;
+    }
+
     public void proxyCreateUser(String pan, String phone, String lender, String dob, List<Map<String, Object>> holdings) {
         String url = baseUrl + "/backend/gatewaydemo-stag/v1/user";
 

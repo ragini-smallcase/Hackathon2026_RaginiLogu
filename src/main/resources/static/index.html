@@ -971,7 +971,7 @@
         ...(ifsc && { ifsc }),
       };
 
-      const res = await fetch('/api/proxy/unity/create-user', {
+      const res = await fetch(`/api/proxy/unity/create-user?journeyStatus=${encodeURIComponent(status)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

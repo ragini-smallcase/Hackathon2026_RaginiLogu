@@ -950,6 +950,7 @@
     try {
       const payload = {
         pan,
+        journeyStatus: status,
         testMeta: { lender },
         productType: 'lamf',
         authContact: { number: authContact, countryCode: '+91' },
@@ -977,9 +978,10 @@
         body: JSON.stringify(payload),
       });
 
-      const json = await res.json();
+      let json;
+      try { json = await res.json(); } catch (_) { json = {}; }
       if (!res.ok || !json.data) {
-        const msg = json.errors?.[0]?.message || json.message || 'Unity API error';
+        const msg = json.errors?.[0]?.message || json.message || `Unity API error (${res.status})`;
         renderError(msg);
         return;
       }

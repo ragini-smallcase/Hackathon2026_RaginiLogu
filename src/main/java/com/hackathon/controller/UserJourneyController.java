@@ -58,6 +58,29 @@ public class UserJourneyController {
         org.springframework.http.HttpEntity<Map<String, Object>> entity = new org.springframework.http.HttpEntity<>(body, headers);
         try {
             ResponseEntity<Object> response = restTemplate.postForEntity(url, entity, Object.class);
+
+            // If user already exists, reset and recreate
+            if (response.getBody() instanceof Map) {
+                Map<?, ?> firstBody = (Map<?, ?>) response.getBody();
+                if ("referrer_already_mapped".equals(firstBody.get("error"))) {
+                    try {
+                        Map<?, ?> testMeta = (Map<?, ?>) body.get("testMeta");
+                        String lender = testMeta != null ? (String) testMeta.get("lender") : "bajaj_finserv";
+                        Map<?, ?> firstData = (Map<?, ?>) firstBody.get("data");
+                        String existingUserId = firstData != null ? (String) firstData.get("unityUserId") : null;
+                        if (existingUserId != null) {
+                            String lid = flowTokenService.getLidFromUnity(existingUserId, lender);
+                            if (lid != null) {
+                                flowTokenService.resetUser(lid, lender);
+                                response = restTemplate.postForEntity(url, entity, Object.class);
+                            }
+                        }
+                    } catch (Exception e) {
+                        System.err.println("[Reset] reset user failed: " + e.getMessage());
+                    }
+                }
+            }
+
             try {
                 String pan = (String) body.get("pan");
                 if (pan != null) ckycFixService.fixCkycUserId(pan);

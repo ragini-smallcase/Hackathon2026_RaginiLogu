@@ -106,6 +106,39 @@ public class UnityApiClient {
         return null;
     }
 
+    public void proxyCreateUser(String pan, String phone, String lender, String dob, List<Map<String, Object>> holdings) {
+        String url = baseUrl + "/backend/gatewaydemo-stag/v1/user";
+
+        HttpHeaders headers = buildHeaders();
+        headers.set("X-Forwarded-For", "43.204.178.93");
+
+        Map<String, Object> authContact = new HashMap<>();
+        authContact.put("number", phone);
+        authContact.put("countryCode", "+91");
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("pan", pan);
+        body.put("dob", dob != null ? dob : "06-12-1996");
+        body.put("lender", lender);
+        body.put("authContact", authContact);
+        body.put("isNri", false);
+        body.put("bankAccounts", Collections.emptyList());
+        body.put("assetType", "MUTUALFUND");
+        body.put("isLienMarkingMocked", true);
+        if (holdings != null && !holdings.isEmpty()) {
+            body.put("holdings", holdings);
+            body.put("isCombinedCASAvailable", true);
+            body.put("holdingsLastFetchedAt", Instant.now().toString());
+        }
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+        try {
+            restTemplate.postForEntity(url, entity, Map.class);
+        } catch (Exception e) {
+            // best-effort — don't fail the main flow
+        }
+    }
+
     private HttpHeaders buildHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

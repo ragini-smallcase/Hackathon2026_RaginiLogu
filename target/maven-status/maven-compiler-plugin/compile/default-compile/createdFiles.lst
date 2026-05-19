@@ -1,6 +1,12 @@
+com/hackathon/model/FlowUsersCKYC.class
 com/hackathon/HackathonApplication.class
-com/hackathon/model/UserJourneyRequest.class
-com/hackathon/client/UnityApiClient.class
+com/hackathon/model/FlowUsersCKYC$CkycPodDetails.class
+com/hackathon/model/FlowUsers.class
 com/hackathon/model/UserJourneyResponse.class
 com/hackathon/controller/UserJourneyController.class
+com/hackathon/service/CkycFixService.class
+com/hackathon/model/UserJourneyRequest.class
+com/hackathon/repository/FlowUsersRepository.class
+com/hackathon/repository/FlowUsersCKYCRepository.class
+com/hackathon/client/UnityApiClient.class
 com/hackathon/service/UserJourneyService.class

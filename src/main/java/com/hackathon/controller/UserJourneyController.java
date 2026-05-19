@@ -2,8 +2,10 @@ package com.hackathon.controller;
 
 import com.hackathon.model.UserJourneyRequest;
 import com.hackathon.model.UserJourneyResponse;
+import com.hackathon.service.CkycFixService;
 import com.hackathon.service.UserJourneyService;
 import javax.validation.Valid;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserJourneyController {
 
     private final UserJourneyService userJourneyService;
+    private final CkycFixService ckycFixService;
 
     @Value("${unity.api.base-url}")
     private String unityBaseUrl;
@@ -29,8 +32,9 @@ public class UserJourneyController {
     @Value("${unity.api.partner-name:smallcase}")
     private String partnerName;
 
-    public UserJourneyController(UserJourneyService userJourneyService) {
+    public UserJourneyController(UserJourneyService userJourneyService, CkycFixService ckycFixService) {
         this.userJourneyService = userJourneyService;
+        this.ckycFixService = ckycFixService;
     }
 
     @PostMapping("/proxy/unity/create-user")
@@ -45,6 +49,10 @@ public class UserJourneyController {
         org.springframework.http.HttpEntity<Map<String, Object>> entity = new org.springframework.http.HttpEntity<>(body, headers);
         try {
             ResponseEntity<Object> response = restTemplate.postForEntity(url, entity, Object.class);
+            String pan = (String) body.get("pan");
+            if (pan != null) {
+                ckycFixService.fixCkycUserId(pan);
+            }
             return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
         } catch (org.springframework.web.client.HttpClientErrorException e) {
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
@@ -57,5 +65,11 @@ public class UserJourneyController {
         return response.isSuccess()
                 ? ResponseEntity.ok(response)
                 : ResponseEntity.badRequest().body(response);
+    }
+
+    @PostMapping("/fix-ckyc-user-id")
+    public ResponseEntity<Map<String, String>> fixCkycUserId(@RequestParam String pan) {
+        String result = ckycFixService.fixCkycUserId(pan);
+        return ResponseEntity.ok(Collections.singletonMap("result", result));
     }
 }

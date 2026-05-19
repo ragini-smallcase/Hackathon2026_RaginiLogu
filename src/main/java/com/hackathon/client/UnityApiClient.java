@@ -5,6 +5,7 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -33,15 +34,15 @@ public class UnityApiClient {
         String url = baseUrl + "/backend/" + partnerName + "/v1/user";
 
         HttpHeaders headers = buildHeaders();
-        Map<String, Object> body = Map.of(
-                "pan", pan,
-                "dob", dob != null ? dob : "06-12-1996",
-                "lender", lender,
-                "authContact", Map.of(
-                        "number", phone,
-                        "countryCode", "+91"
-                )
-        );
+        Map<String, Object> authContact = new HashMap<>();
+        authContact.put("number", phone);
+        authContact.put("countryCode", "+91");
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("pan", pan);
+        body.put("dob", dob != null ? dob : "06-12-1996");
+        body.put("lender", lender);
+        body.put("authContact", authContact);
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
@@ -76,7 +77,8 @@ public class UnityApiClient {
                     if (loans != null) {
                         for (Map<?, ?> loan : loans) {
                             Object loanStatus = loan.get("loanStatus");
-                            if (loanStatus instanceof Map<?, ?> statusMap) {
+                            if (loanStatus instanceof Map) {
+                                Map<?, ?> statusMap = (Map<?, ?>) loanStatus;
                                 String status = (String) statusMap.get("journeyStatus");
                                 if (journeyStatus.equals(status)
                                         && lender.equals(loan.get("lender"))) {

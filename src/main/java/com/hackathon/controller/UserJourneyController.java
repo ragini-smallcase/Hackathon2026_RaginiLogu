@@ -3,7 +3,7 @@ package com.hackathon.controller;
 import com.hackathon.model.UserJourneyRequest;
 import com.hackathon.model.UserJourneyResponse;
 import com.hackathon.service.UserJourneyService;
-import jakarta.validation.Valid;
+import javax.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

@@ -378,6 +378,61 @@
     .badge-amber  { background: #fef3c7; color: #92400e; }
     .badge-red    { background: #fee2e2; color: #991b1b; }
 
+    /* ── Info Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal-box {
+      background: #fff;
+      border-radius: 14px;
+      padding: 32px 28px 24px;
+      max-width: 440px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      position: relative;
+    }
+    .modal-icon {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 22px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px;
+    }
+    .modal-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 10px;
+    }
+    .modal-body {
+      font-size: 14px;
+      color: #4b5563;
+      line-height: 1.6;
+    }
+    .modal-body strong { color: #92400e; }
+    .modal-close-btn {
+      margin-top: 22px;
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .modal-close-btn:hover { opacity: 0.9; }
+
     /* ── Footer ── */
     footer {
       text-align: center;
@@ -615,6 +670,18 @@
 </main>
 
 <footer>LAMF Hackathon 2026 &mdash; Internal Tool</footer>
+
+<div id="linkBankModal" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <div class="modal-icon">&#9432;</div>
+    <div class="modal-title">Data Notice — Link Bank Account</div>
+    <div class="modal-body">
+      The bank and CKYC data being used here is <strong>dummy / sourced from older CKYC documents</strong> already on record for this user.<br><br>
+      For accurate, real-time data this step must be completed through the <strong>actual DL (Document Lookup) flow</strong>, which fetches live details directly from the source.
+    </div>
+    <button class="modal-close-btn" onclick="document.getElementById('linkBankModal').classList.remove('visible')">Got it</button>
+  </div>
+</div>
 
 <script>
   const form = document.getElementById('journeyForm');
@@ -1004,6 +1071,9 @@
         journeyStatus: status,
         lender: json.data.lender || lender,
       });
+      if (status === 'LINK_BANK_ACCOUNT') {
+        document.getElementById('linkBankModal').classList.add('visible');
+      }
     } catch (err) {
       renderError('Network error: ' + err.message);
     } finally {

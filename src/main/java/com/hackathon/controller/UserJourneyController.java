@@ -9,6 +9,7 @@ import javax.validation.Valid;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -34,6 +35,9 @@ public class UserJourneyController {
     @Value("${unity.api.partner-name:smallcase}")
     private String partnerName;
 
+    @Value("${smartinvesting.api.base-url:http://localhost:3000}")
+    private String smartInvestingBaseUrl;
+
     public UserJourneyController(UserJourneyService userJourneyService, CkycFixService ckycFixService, FlowTokenService flowTokenService) {
         this.userJourneyService = userJourneyService;
         this.ckycFixService = ckycFixService;
@@ -54,6 +58,29 @@ public class UserJourneyController {
         org.springframework.http.HttpEntity<Map<String, Object>> entity = new org.springframework.http.HttpEntity<>(body, headers);
         try {
             ResponseEntity<Object> response = restTemplate.postForEntity(url, entity, Object.class);
+
+            // If user already exists, reset and recreate
+            if (response.getBody() instanceof Map) {
+                Map<?, ?> firstBody = (Map<?, ?>) response.getBody();
+                if ("referrer_already_mapped".equals(firstBody.get("error"))) {
+                    try {
+                        Map<?, ?> testMeta = (Map<?, ?>) body.get("testMeta");
+                        String lender = testMeta != null ? (String) testMeta.get("lender") : "bajaj_finserv";
+                        Map<?, ?> firstData = (Map<?, ?>) firstBody.get("data");
+                        String existingUserId = firstData != null ? (String) firstData.get("unityUserId") : null;
+                        if (existingUserId != null) {
+                            String lid = flowTokenService.getLidFromUnity(existingUserId, lender);
+                            if (lid != null) {
+                                flowTokenService.resetUser(lid, lender);
+                                response = restTemplate.postForEntity(url, entity, Object.class);
+                            }
+                        }
+                    } catch (Exception e) {
+                        System.err.println("[Reset] reset user failed: " + e.getMessage());
+                    }
+                }
+            }
+
             try {
                 String pan = (String) body.get("pan");
                 if (pan != null) ckycFixService.fixCkycUserId(pan);
@@ -74,6 +101,25 @@ public class UserJourneyController {
                 }
             }
 
+            // Register user in SmartInvesting and attach opaqueId to response
+            if (response.getBody() instanceof Map) {
+                Map<String, Object> responseBody = (Map<String, Object>) response.getBody();
+                Map<String, Object> data = (Map<String, Object>) responseBody.get("data");
+                String opaqueId = UUID.randomUUID().toString();
+                if (data != null) data.put("opaqueId", opaqueId);
+                try {
+                    Map<String, Object> gwFePayload = new HashMap<>(body);
+                    gwFePayload.put("id", opaqueId);
+                    org.springframework.web.client.RestTemplate gwFeClient = new org.springframework.web.client.RestTemplate();
+                    org.springframework.http.HttpHeaders gwFeHeaders = new org.springframework.http.HttpHeaders();
+                    gwFeHeaders.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+                    gwFeHeaders.set("x-gateway-unity-env", "primary");
+                    gwFeClient.postForEntity(smartInvestingBaseUrl + "/las/user",
+                            new org.springframework.http.HttpEntity<>(gwFePayload, gwFeHeaders), Object.class);
+                } catch (Exception e) {
+                    System.err.println("[SmartInvesting] register user failed: " + e.getMessage());
+                }
+            }
             return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
         } catch (org.springframework.web.client.HttpClientErrorException e) {
             String errorBody = e.getResponseBodyAsString();

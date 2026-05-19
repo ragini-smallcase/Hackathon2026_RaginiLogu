@@ -34,6 +34,9 @@ public class FlowTokenService {
     @Value("${flow.api.holdings-summary-cookie}")
     private String holdingsSummaryCookie;
 
+    @Value("${flow.api.reset-auth-token}")
+    private String resetAuthToken;
+
     private static final String WHITELISTED_IP = "43.204.178.93";
 
     private final RestTemplate restTemplate = new RestTemplate(
@@ -160,6 +163,48 @@ public class FlowTokenService {
         String interactionUrl = initInteraction(jwtToken);
         String extractedToken = extractTokenFromUrl(interactionUrl);
         return exchangeTokenForFlowAuth(extractedToken, lender);
+    }
+
+    // Get the loan ID (lid) for a given unityUserId and lender from Unity
+    @SuppressWarnings("unchecked")
+    public String getLidFromUnity(String unityUserId, String lender) {
+        String url = unityBaseUrl + "/backend/" + partnerName + "/v1/user/" + unityUserId;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("x-gateway-secret", gatewaySecret);
+        headers.set("x-gateway-authtoken", gatewayAuthToken);
+        headers.set("X-Forwarded-For", WHITELISTED_IP);
+
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+        Map<?, ?> data = (Map<?, ?>) response.getBody().get("data");
+        java.util.List<?> loans = (java.util.List<?>) data.get("loans");
+        if (loans == null) return null;
+        for (Object loan : loans) {
+            Map<?, ?> loanMap = (Map<?, ?>) loan;
+            if (lender.equals(loanMap.get("lender")) && "ACTIVE".equals(loanMap.get("status"))) {
+                return (String) loanMap.get("lid");
+            }
+        }
+        return null;
+    }
+
+    // Reset an existing user's flow loan so a fresh user can be created
+    public void resetUser(String lid, String lender) {
+        String url = bfinBaseUrl + "/" + lender + "/lamf/internal/ops/resetUser";
+
+        Map<String, Object> flags = new HashMap<>();
+        flags.put("overridePledgedHoldingsCheck", true);
+        flags.put("overrideLoanClosedCheck", true);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("lid", lid);
+        body.put("flags", flags);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", "Bearer " + resetAuthToken);
+
+        restTemplate.postForEntity(url, new HttpEntity<>(body, headers), Object.class);
     }
 
     // Move journey to FETCH_CKYC step

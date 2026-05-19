@@ -2,8 +2,10 @@ package com.hackathon.controller;
 
 import com.hackathon.model.UserJourneyRequest;
 import com.hackathon.model.UserJourneyResponse;
+import com.hackathon.service.CkycFixService;
 import com.hackathon.service.UserJourneyService;
 import javax.validation.Valid;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserJourneyController {
 
     private final UserJourneyService userJourneyService;
+    private final CkycFixService ckycFixService;
 
     @Value("${unity.api.base-url}")
     private String unityBaseUrl;
@@ -29,8 +32,9 @@ public class UserJourneyController {
     @Value("${unity.api.partner-name:smallcase}")
     private String partnerName;
 
-    public UserJourneyController(UserJourneyService userJourneyService) {
+    public UserJourneyController(UserJourneyService userJourneyService, CkycFixService ckycFixService) {
         this.userJourneyService = userJourneyService;
+        this.ckycFixService = ckycFixService;
     }
 
     @PostMapping("/proxy/unity/create-user")
@@ -57,5 +61,11 @@ public class UserJourneyController {
         return response.isSuccess()
                 ? ResponseEntity.ok(response)
                 : ResponseEntity.badRequest().body(response);
+    }
+
+    @PostMapping("/fix-ckyc-user-id")
+    public ResponseEntity<Map<String, String>> fixCkycUserId(@RequestParam String pan) {
+        String result = ckycFixService.fixCkycUserId(pan);
+        return ResponseEntity.ok(Collections.singletonMap("result", result));
     }
 }

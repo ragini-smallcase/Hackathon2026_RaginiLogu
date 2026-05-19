@@ -4,6 +4,7 @@ import com.hackathon.model.UserJourneyRequest;
 import com.hackathon.model.UserJourneyResponse;
 import com.hackathon.service.CkycFixService;
 import com.hackathon.service.FlowTokenService;
+import com.hackathon.service.LinkBankAccountService;
 import com.hackathon.service.UserJourneyService;
 import javax.validation.Valid;
 import java.util.Collections;
@@ -22,6 +23,7 @@ public class UserJourneyController {
     private final UserJourneyService userJourneyService;
     private final CkycFixService ckycFixService;
     private final FlowTokenService flowTokenService;
+    private final LinkBankAccountService linkBankAccountService;
 
     @Value("${unity.api.base-url}")
     private String unityBaseUrl;
@@ -38,15 +40,18 @@ public class UserJourneyController {
     @Value("${smartinvesting.api.base-url:http://localhost:3000}")
     private String smartInvestingBaseUrl;
 
-    public UserJourneyController(UserJourneyService userJourneyService, CkycFixService ckycFixService, FlowTokenService flowTokenService) {
+    public UserJourneyController(UserJourneyService userJourneyService, CkycFixService ckycFixService, FlowTokenService flowTokenService, LinkBankAccountService linkBankAccountService) {
         this.userJourneyService = userJourneyService;
         this.ckycFixService = ckycFixService;
         this.flowTokenService = flowTokenService;
+        this.linkBankAccountService = linkBankAccountService;
     }
 
     @SuppressWarnings("unchecked")
     @PostMapping("/proxy/unity/create-user")
-    public ResponseEntity<Object> proxyUnityCreateUser(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<Object> proxyUnityCreateUser(
+            @RequestBody Map<String, Object> body,
+            @RequestParam(required = false) String journeyStatus) {
         String url = unityBaseUrl + "/backend/gatewaydemo-stag/v1/user";
         org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
@@ -54,7 +59,7 @@ public class UserJourneyController {
         headers.set("x-gateway-secret", gatewaySecret);
         headers.set("x-gateway-authtoken", authToken);
         headers.set("X-Forwarded-For", "43.204.178.93");
-        String journeyStatus = (String) body.remove("journeyStatus");
+        body.remove("journeyStatus");
         org.springframework.http.HttpEntity<Map<String, Object>> entity = new org.springframework.http.HttpEntity<>(body, headers);
         try {
             ResponseEntity<Object> response = restTemplate.postForEntity(url, entity, Object.class);
@@ -83,8 +88,23 @@ public class UserJourneyController {
 
             try {
                 String pan = (String) body.get("pan");
-                if (pan != null) ckycFixService.fixCkycUserId(pan);
-            } catch (Exception ignored) {}
+                System.out.println("[DEBUG] journeyStatus=" + journeyStatus + " pan=" + pan);
+                if ("LINK_BANK_ACCOUNT".equals(journeyStatus)) {
+                    String unityUserId = extractUnityUserId(response.getBody());
+                    System.out.println("[DEBUG] unityUserId=" + unityUserId);
+                    if (pan != null && unityUserId != null) {
+                        String dbResult = linkBankAccountService.process(pan, unityUserId);
+                        System.out.println("[DEBUG] DB result: " + dbResult);
+                    } else {
+                        System.out.println("[DEBUG] Skipped: pan=" + pan + " unityUserId=" + unityUserId);
+                    }
+                } else {
+                    if (pan != null) ckycFixService.fixCkycUserId(pan);
+                }
+            } catch (Exception e) {
+                System.err.println("[DEBUG] Exception in post-processing: " + e.getMessage());
+                e.printStackTrace();
+            }
             if ("FETCH_CKYC".equals(journeyStatus) && response.getBody() instanceof Map) {
                 try {
                     Map<?, ?> responseBody = (Map<?, ?>) response.getBody();
@@ -151,5 +171,22 @@ public class UserJourneyController {
     public ResponseEntity<Map<String, String>> fixCkycUserId(@RequestParam String pan) {
         String result = ckycFixService.fixCkycUserId(pan);
         return ResponseEntity.ok(Collections.singletonMap("result", result));
+    }
+
+    @PostMapping("/debug/link-bank-account")
+    public ResponseEntity<Map<String, String>> debugLinkBankAccount(@RequestParam String pan, @RequestParam String flowId) {
+        String result = linkBankAccountService.updateDb(pan, flowId);
+        return ResponseEntity.ok(Collections.singletonMap("result", result));
+    }
+
+    private String extractUnityUserId(Object responseBody) {
+        if (responseBody instanceof Map) {
+            Object data = ((Map<?, ?>) responseBody).get("data");
+            if (data instanceof Map) {
+                Object uid = ((Map<?, ?>) data).get("unityUserId");
+                if (uid instanceof String) return (String) uid;
+            }
+        }
+        return null;
     }
 }

@@ -127,6 +127,13 @@
       appearance: none;
     }
 
+    input:disabled, select:disabled {
+      background: #f3f4f6;
+      color: #9ca3af;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
     input:focus, select:focus {
       border-color: #667eea;
       background: #fff;
@@ -536,14 +543,40 @@
                   <option value="CONFIRM_OFFER">Confirm Offer</option>
                   <option value="FETCH_CKYC">Fetch CKYC</option>
                   <option value="LINK_BANK_ACCOUNT">Link Bank Account</option>
-                  <option value="IMPORT_HOLDINGS">Import Holdings</option>
                   <option value="PLEDGE_FUNDS">Pledge Funds</option>
                   <option value="SIGN_AGREEMENT">Sign Agreement</option>
                   <option value="VIDEO_KYC">Video KYC</option>
-                  <option value="SUBMITTED">Submitted</option>
                 </select>
               </div>
               <div class="field-error" id="journeyStatus-error">Please select a journey status</div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="bankAccountNumber">Bank Account Number <span class="required">*</span></label>
+              <input
+                type="text"
+                id="bankAccountNumber"
+                name="bankAccountNumber"
+                placeholder="e.g. 1234567890"
+                autocomplete="off"
+                disabled
+              />
+              <div class="field-error" id="bankAccountNumber-error">Bank account number is required</div>
+            </div>
+            <div class="form-group">
+              <label for="ifsc">IFSC Code <span class="required">*</span></label>
+              <input
+                type="text"
+                id="ifsc"
+                name="ifsc"
+                placeholder="e.g. SBIN0001234"
+                autocomplete="off"
+                spellcheck="false"
+                disabled
+              />
+              <div class="field-error" id="ifsc-error">IFSC code is required</div>
             </div>
           </div>
 
@@ -677,6 +710,13 @@
     if (!lender)                       { showError('lender', true);        valid = false; } else showError('lender', false);
     if (!status)                       { showError('journeyStatus', true); valid = false; } else showError('journeyStatus', false);
 
+    if (BANK_REQUIRED_STATUSES.has(status)) {
+      const bankAccNum = document.getElementById('bankAccountNumber').value.trim();
+      const ifscVal    = document.getElementById('ifsc').value.trim();
+      if (!bankAccNum) { showError('bankAccountNumber', true);  valid = false; } else showError('bankAccountNumber', false);
+      if (!ifscVal)    { showError('ifsc', true);               valid = false; } else showError('ifsc', false);
+    }
+
     try {
       const parsed = JSON.parse(holdings);
       if (!Array.isArray(parsed) || parsed.length === 0) throw new Error();
@@ -696,6 +736,20 @@
 
     return valid;
   }
+
+  // ── Bank fields: enable/disable based on journey status ──
+  const BANK_REQUIRED_STATUSES = new Set(['LINK_BANK_ACCOUNT', 'PLEDGE_FUNDS', 'SIGN_AGREEMENT', 'VIDEO_KYC']);
+
+  function updateBankFields() {
+    const required = BANK_REQUIRED_STATUSES.has(document.getElementById('journeyStatus').value);
+    ['bankAccountNumber', 'ifsc'].forEach(id => {
+      const el = document.getElementById(id);
+      el.disabled = !required;
+      if (!required) { el.value = ''; showError(id, false); }
+    });
+  }
+
+  document.getElementById('journeyStatus').addEventListener('change', updateBankFields);
 
   // ── Auto-uppercase PAN ──
   document.getElementById('pan').addEventListener('input', function() {
@@ -929,6 +983,8 @@
     const phones      = getPhoneContacts();
     const emails      = getEmailContacts();
     const contacts    = buildContactsArray(phones, emails);
+    const bankAccountNumber = BANK_REQUIRED_STATUSES.has(status) ? document.getElementById('bankAccountNumber').value.trim() : undefined;
+    const ifsc              = BANK_REQUIRED_STATUSES.has(status) ? document.getElementById('ifsc').value.trim()              : undefined;
 
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span class="spinner"></span>Creating...';
@@ -941,7 +997,9 @@
         data = await callConfirmOffer(pan, authContact, lender, holdings, contacts);
       } else {
         const payload = { pan, phone: authContact, lender, journeyStatus: status, holdings };
-        if (transactionId) payload.transactionId = transactionId;
+        if (transactionId)     payload.transactionId     = transactionId;
+        if (bankAccountNumber) payload.bankAccountNumber = bankAccountNumber;
+        if (ifsc)              payload.ifsc              = ifsc;
 
         const res = await fetch('/api/user-journey', {
           method: 'POST',

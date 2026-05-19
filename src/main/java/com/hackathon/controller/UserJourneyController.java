@@ -49,10 +49,10 @@ public class UserJourneyController {
         org.springframework.http.HttpEntity<Map<String, Object>> entity = new org.springframework.http.HttpEntity<>(body, headers);
         try {
             ResponseEntity<Object> response = restTemplate.postForEntity(url, entity, Object.class);
-            String pan = (String) body.get("pan");
-            if (pan != null) {
-                ckycFixService.fixCkycUserId(pan);
-            }
+            try {
+                String pan = (String) body.get("pan");
+                if (pan != null) ckycFixService.fixCkycUserId(pan);
+            } catch (Exception ignored) {}
             return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
         } catch (org.springframework.web.client.HttpClientErrorException e) {
             return ResponseEntity.status(e.getStatusCode()).body(e.getResponseBodyAsString());
@@ -62,6 +62,9 @@ public class UserJourneyController {
     @PostMapping("/user-journey")
     public ResponseEntity<UserJourneyResponse> getUserAtJourneyStep(@Valid @RequestBody UserJourneyRequest request) {
         UserJourneyResponse response = userJourneyService.findOrCreateUser(request);
+        if (response.isSuccess() && "CONFIRM_OFFER".equals(request.getJourneyStatus())) {
+            ckycFixService.fixCkycUserId(request.getPan());
+        }
         return response.isSuccess()
                 ? ResponseEntity.ok(response)
                 : ResponseEntity.badRequest().body(response);

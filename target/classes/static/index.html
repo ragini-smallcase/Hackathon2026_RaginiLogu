@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LAMF User Journey Finder</title>
+  <title>LAMF User Creator</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -378,6 +378,61 @@
       font-size: 12px;
       color: #9ca3af;
     }
+
+    /* ── Contact rows ── */
+    .contact-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+
+    .contact-row input { margin-bottom: 0; }
+
+    .btn-remove-contact {
+      flex-shrink: 0;
+      width: 30px;
+      height: 30px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 6px;
+      background: #fff;
+      color: #9ca3af;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .btn-remove-contact:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+
+    .btn-add-contact {
+      background: none;
+      border: 1.5px dashed #667eea;
+      border-radius: 8px;
+      color: #667eea;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 7px 14px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 2px;
+      transition: background 0.15s;
+    }
+
+    .btn-add-contact:hover { background: #f0f2ff; }
+
+    .contacts-section-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+      letter-spacing: 0.2px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
   </style>
 </head>
 <body>
@@ -385,8 +440,8 @@
 <header>
   <div class="logo">L</div>
   <div>
-    <h1>LAMF User Journey Finder</h1>
-    <p>Retrieve the Unity User ID at a specific loan journey step</p>
+    <h1>LAMF User Creator</h1>
+    <p>Create a Unity test user for a specific loan journey step</p>
   </div>
 </header>
 
@@ -394,8 +449,8 @@
   <div class="container">
     <div class="card">
       <div class="card-header">
-        <h2>Find User by Journey Status</h2>
-        <p>Enter the user credentials, lender, and the desired journey step</p>
+        <h2>Create User</h2>
+        <p>Enter the user credentials, lender, and desired journey step</p>
       </div>
 
       <div class="card-body">
@@ -417,16 +472,46 @@
             </div>
 
             <div class="form-group">
-              <label for="phone">Phone Number <span class="required">*</span></label>
+              <label for="authContact">Auth Contact <span class="required">*</span></label>
               <input
                 type="tel"
-                id="phone"
-                name="phone"
+                id="authContact"
+                name="authContact"
                 placeholder="9999999999"
                 maxlength="10"
               />
-              <div class="field-error" id="phone-error">Enter a valid 10-digit phone number</div>
+              <div class="field-error" id="authContact-error">Enter a valid 10-digit auth contact number</div>
             </div>
+          </div>
+
+          <!-- Phone Contacts -->
+          <div class="form-group">
+            <div class="contacts-section-label">
+              Phone Numbers <span class="required">*</span>
+            </div>
+            <div id="phoneContactsList">
+              <div class="contact-row">
+                <input type="tel" class="phone-contact-input" placeholder="9999999999" maxlength="10" oninput="onPhoneContactInput(this, 0)" />
+                <button type="button" class="btn-remove-contact" onclick="removeContactRow(this)" style="display:none" title="Remove">&#10005;</button>
+              </div>
+            </div>
+            <button type="button" class="btn-add-contact" onclick="addPhoneContact()">+ Add Phone</button>
+            <div class="field-error" id="phoneContacts-error">At least one phone number is required</div>
+          </div>
+
+          <!-- Email Contacts -->
+          <div class="form-group">
+            <div class="contacts-section-label">
+              Email Addresses <span class="required">*</span>
+            </div>
+            <div id="emailContactsList">
+              <div class="contact-row">
+                <input type="email" class="email-contact-input" placeholder="user@example.com" />
+                <button type="button" class="btn-remove-contact" onclick="removeContactRow(this)" style="display:none" title="Remove">&#10005;</button>
+              </div>
+            </div>
+            <button type="button" class="btn-add-contact" onclick="addEmailContact()">+ Add Email</button>
+            <div class="field-error" id="emailContacts-error">At least one email address is required</div>
           </div>
 
           <div class="form-row">
@@ -485,7 +570,7 @@
           </div>
 
           <button type="submit" class="btn-submit" id="submitBtn">
-            Find User ID
+            Create User
           </button>
         </form>
 
@@ -551,8 +636,9 @@
   document.getElementById('holdings').value = JSON.stringify(DEFAULT_HOLDINGS, null, 2);
 
   // ── Validation helpers ──
-  const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+  const PAN_REGEX   = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
   const PHONE_REGEX = /^\d{10}$/;
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   function showError(fieldId, show) {
     const el  = document.getElementById(fieldId);
@@ -566,18 +652,30 @@
     }
   }
 
+  function showSectionError(errId, inputListId, show) {
+    const err = document.getElementById(errId);
+    const inputs = document.querySelectorAll('#' + inputListId + ' input');
+    if (show) {
+      err.classList.add('visible');
+      inputs.forEach(i => i.classList.add('error'));
+    } else {
+      err.classList.remove('visible');
+      inputs.forEach(i => i.classList.remove('error'));
+    }
+  }
+
   function validate() {
     let valid = true;
-    const pan      = document.getElementById('pan').value.trim().toUpperCase();
-    const phone    = document.getElementById('phone').value.trim();
-    const lender   = document.getElementById('lender').value;
-    const status   = document.getElementById('journeyStatus').value;
-    const holdings = document.getElementById('holdings').value.trim();
+    const pan        = document.getElementById('pan').value.trim().toUpperCase();
+    const authContact = document.getElementById('authContact').value.trim();
+    const lender     = document.getElementById('lender').value;
+    const status     = document.getElementById('journeyStatus').value;
+    const holdings   = document.getElementById('holdings').value.trim();
 
-    if (!PAN_REGEX.test(pan))     { showError('pan', true);           valid = false; } else showError('pan', false);
-    if (!PHONE_REGEX.test(phone)) { showError('phone', true);         valid = false; } else showError('phone', false);
-    if (!lender)                  { showError('lender', true);        valid = false; } else showError('lender', false);
-    if (!status)                  { showError('journeyStatus', true); valid = false; } else showError('journeyStatus', false);
+    if (!PAN_REGEX.test(pan))          { showError('pan', true);           valid = false; } else showError('pan', false);
+    if (!PHONE_REGEX.test(authContact)){ showError('authContact', true);   valid = false; } else showError('authContact', false);
+    if (!lender)                       { showError('lender', true);        valid = false; } else showError('lender', false);
+    if (!status)                       { showError('journeyStatus', true); valid = false; } else showError('journeyStatus', false);
 
     try {
       const parsed = JSON.parse(holdings);
@@ -588,13 +686,100 @@
       valid = false;
     }
 
+    // Phone & email contacts always mandatory
+    const phones = getPhoneContacts();
+    const emails = getEmailContacts();
+    if (phones.length === 0) { showSectionError('phoneContacts-error', 'phoneContactsList', true);  valid = false; }
+    else                     { showSectionError('phoneContacts-error', 'phoneContactsList', false); }
+    if (emails.length === 0) { showSectionError('emailContacts-error', 'emailContactsList', true);  valid = false; }
+    else                     { showSectionError('emailContacts-error', 'emailContactsList', false); }
+
     return valid;
   }
 
-  // Auto-uppercase PAN
+  // ── Auto-uppercase PAN ──
   document.getElementById('pan').addEventListener('input', function() {
     this.value = this.value.toUpperCase();
   });
+
+  // ── Sync first phone → authContact if not manually overridden ──
+  let authContactSynced = true;
+  document.getElementById('authContact').addEventListener('input', function() {
+    authContactSynced = false;
+  });
+
+  function onPhoneContactInput(input, index) {
+    if (index === 0 && authContactSynced) {
+      document.getElementById('authContact').value = input.value;
+    }
+  }
+
+  // ── Contact list helpers ──
+  function getPhoneContacts() {
+    const inputs = document.querySelectorAll('#phoneContactsList .phone-contact-input');
+    return Array.from(inputs).map(i => i.value.trim()).filter(v => PHONE_REGEX.test(v));
+  }
+
+  function getEmailContacts() {
+    const inputs = document.querySelectorAll('#emailContactsList .email-contact-input');
+    return Array.from(inputs).map(i => i.value.trim()).filter(v => EMAIL_REGEX.test(v));
+  }
+
+  function buildContactsArray(phones, emails) {
+    const contacts = [];
+    phones.forEach((num, i) => contacts.push({
+      type: 'PHONE',
+      phone: { number: num, countryCode: '+91' },
+      isVerified: true,
+      isPrimary: i === 0,
+    }));
+    emails.forEach((email, i) => contacts.push({
+      type: 'EMAIL',
+      email: email,
+      isVerified: true,
+      isPrimary: i === 0,
+    }));
+    return contacts;
+  }
+
+  function updateRemoveButtons(listId) {
+    const rows = document.querySelectorAll('#' + listId + ' .contact-row');
+    rows.forEach(row => {
+      row.querySelector('.btn-remove-contact').style.display = rows.length > 1 ? 'flex' : 'none';
+    });
+  }
+
+  function removeContactRow(btn) {
+    const row = btn.closest('.contact-row');
+    const list = row.parentElement;
+    row.remove();
+    updateRemoveButtons(list.id);
+    if (list.id === 'phoneContactsList') {
+      const first = list.querySelector('.phone-contact-input');
+      if (first && authContactSynced) document.getElementById('authContact').value = first.value;
+    }
+  }
+
+  function addPhoneContact() {
+    const list = document.getElementById('phoneContactsList');
+    const idx  = list.querySelectorAll('.contact-row').length;
+    const row  = document.createElement('div');
+    row.className = 'contact-row';
+    row.innerHTML = `<input type="tel" class="phone-contact-input" placeholder="9999999999" maxlength="10" oninput="onPhoneContactInput(this, ${idx})" />
+                     <button type="button" class="btn-remove-contact" onclick="removeContactRow(this)" title="Remove">&#10005;</button>`;
+    list.appendChild(row);
+    updateRemoveButtons('phoneContactsList');
+  }
+
+  function addEmailContact() {
+    const list = document.getElementById('emailContactsList');
+    const row  = document.createElement('div');
+    row.className = 'contact-row';
+    row.innerHTML = `<input type="email" class="email-contact-input" placeholder="user@example.com" />
+                     <button type="button" class="btn-remove-contact" onclick="removeContactRow(this)" title="Remove">&#10005;</button>`;
+    list.appendChild(row);
+    updateRemoveButtons('emailContactsList');
+  }
 
   // ── Journey status badge colour ──
   const STATUS_BADGE = {
@@ -688,12 +873,12 @@
   }
 
   // ── Confirm Offer: call Unity staging API directly ──
-  async function callConfirmOffer(pan, phone, lender, holdings) {
+  async function callConfirmOffer(pan, authContact, lender, holdings, contacts) {
     const payload = {
       pan: pan,
       testMeta: { lender: lender },
       productType: 'lamf',
-      authContact: { number: phone, countryCode: '+91' },
+      authContact: { number: authContact, countryCode: '+91' },
       smallcaseContext: {
         broker: 'kite',
         isInternalUser: true,
@@ -701,14 +886,7 @@
         isInvested: false,
         analyticsId: 'ct12345678',
       },
-      contacts: [
-        {
-          type: 'PHONE',
-          phone: { number: phone, countryCode: '+91' },
-          isVerified: true,
-          isPrimary: true,
-        },
-      ],
+      ...(contacts.length && { contacts }),
       assetType: 'MUTUALFUND',
       holdings: holdings && holdings.length ? holdings : null,
       holdingsLastFetchedAt: new Date().toISOString(),
@@ -742,24 +920,27 @@
     e.preventDefault();
     if (!validate()) return;
 
-    const pan      = document.getElementById('pan').value.trim().toUpperCase();
-    const phone    = document.getElementById('phone').value.trim();
-    const lender   = document.getElementById('lender').value;
-    const status   = document.getElementById('journeyStatus').value;
-    const holdings       = JSON.parse(document.getElementById('holdings').value.trim());
-    const transactionId  = document.getElementById('transactionId').value.trim() || undefined;
+    const pan         = document.getElementById('pan').value.trim().toUpperCase();
+    const authContact = document.getElementById('authContact').value.trim();
+    const lender      = document.getElementById('lender').value;
+    const status      = document.getElementById('journeyStatus').value;
+    const holdings    = JSON.parse(document.getElementById('holdings').value.trim());
+    const transactionId = document.getElementById('transactionId').value.trim() || undefined;
+    const phones      = getPhoneContacts();
+    const emails      = getEmailContacts();
+    const contacts    = buildContactsArray(phones, emails);
 
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner"></span>Searching...';
+    submitBtn.innerHTML = '<span class="spinner"></span>Creating...';
     resultEl.className = '';
     resultEl.innerHTML = '';
 
     try {
       let data;
       if (status === 'CONFIRM_OFFER') {
-        data = await callConfirmOffer(pan, phone, lender, holdings);
+        data = await callConfirmOffer(pan, authContact, lender, holdings, contacts);
       } else {
-        const payload = { pan, phone, lender, journeyStatus: status, holdings };
+        const payload = { pan, phone: authContact, lender, journeyStatus: status, holdings };
         if (transactionId) payload.transactionId = transactionId;
 
         const res = await fetch('/api/user-journey', {
@@ -778,7 +959,7 @@
       renderError('Network error: ' + err.message);
     } finally {
       submitBtn.disabled = false;
-      submitBtn.innerHTML = 'Find User ID';
+      submitBtn.innerHTML = 'Create User';
     }
   });
 </script>

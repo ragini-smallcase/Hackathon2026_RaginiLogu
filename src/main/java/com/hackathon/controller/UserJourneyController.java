@@ -9,6 +9,7 @@ import javax.validation.Valid;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -33,6 +34,9 @@ public class UserJourneyController {
 
     @Value("${unity.api.partner-name:smallcase}")
     private String partnerName;
+
+    @Value("${smartinvesting.api.base-url:http://localhost:3000}")
+    private String smartInvestingBaseUrl;
 
     public UserJourneyController(UserJourneyService userJourneyService, CkycFixService ckycFixService, FlowTokenService flowTokenService) {
         this.userJourneyService = userJourneyService;
@@ -74,6 +78,25 @@ public class UserJourneyController {
                 }
             }
 
+            // Register user in SmartInvesting and attach opaqueId to response
+            if (response.getBody() instanceof Map) {
+                Map<String, Object> responseBody = (Map<String, Object>) response.getBody();
+                Map<String, Object> data = (Map<String, Object>) responseBody.get("data");
+                String opaqueId = UUID.randomUUID().toString();
+                if (data != null) data.put("opaqueId", opaqueId);
+                try {
+                    Map<String, Object> gwFePayload = new HashMap<>(body);
+                    gwFePayload.put("id", opaqueId);
+                    org.springframework.web.client.RestTemplate gwFeClient = new org.springframework.web.client.RestTemplate();
+                    org.springframework.http.HttpHeaders gwFeHeaders = new org.springframework.http.HttpHeaders();
+                    gwFeHeaders.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+                    gwFeHeaders.set("x-gateway-unity-env", "primary");
+                    gwFeClient.postForEntity(smartInvestingBaseUrl + "/las/user",
+                            new org.springframework.http.HttpEntity<>(gwFePayload, gwFeHeaders), Object.class);
+                } catch (Exception e) {
+                    System.err.println("[SmartInvesting] register user failed: " + e.getMessage());
+                }
+            }
             return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
         } catch (org.springframework.web.client.HttpClientErrorException e) {
             String errorBody = e.getResponseBodyAsString();

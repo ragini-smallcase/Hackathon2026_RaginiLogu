@@ -946,7 +946,7 @@
     const authContact = document.getElementById('authContact').value.trim();
     const lender      = document.getElementById('lender').value;
     const status      = document.getElementById('journeyStatus').value;
-    const holdings    = JSON.parse(document.getElementById('holdings').value.trim());
+    let holdings; try { holdings = JSON.parse(document.getElementById('holdings').value.trim()); } catch(_) { holdings = []; }
     const phones      = getPhoneContacts();
     const emails      = getEmailContacts();
     const contacts    = buildContactsArray(phones, emails);

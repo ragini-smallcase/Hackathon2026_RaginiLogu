@@ -2,6 +2,8 @@ package com.hackathon.model;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Pattern;
+import java.util.List;
+import java.util.Map;
 
 public class UserJourneyRequest {
 
@@ -21,6 +23,8 @@ public class UserJourneyRequest {
 
     private String dob;
 
+    private List<Map<String, Object>> holdings;
+
     public String getPan() { return pan; }
     public void setPan(String pan) { this.pan = pan; }
 
@@ -35,4 +39,7 @@ public class UserJourneyRequest {
 
     public String getDob() { return dob; }
     public void setDob(String dob) { this.dob = dob; }
+
+    public List<Map<String, Object>> getHoldings() { return holdings; }
+    public void setHoldings(List<Map<String, Object>> holdings) { this.holdings = holdings; }
 }

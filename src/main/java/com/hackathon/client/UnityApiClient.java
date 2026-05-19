@@ -5,6 +5,8 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Instant;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +32,7 @@ public class UnityApiClient {
         this.restTemplate = new RestTemplate();
     }
 
-    public String createOrGetUser(String pan, String phone, String lender, String dob) {
+    public String createOrGetUser(String pan, String phone, String lender, String dob, List<Map<String, Object>> holdings) {
         String url = baseUrl + "/backend/" + partnerName + "/v1/user";
 
         HttpHeaders headers = buildHeaders();
@@ -43,6 +45,15 @@ public class UnityApiClient {
         body.put("dob", dob != null ? dob : "06-12-1996");
         body.put("lender", lender);
         body.put("authContact", authContact);
+        body.put("isNri", false);
+        body.put("bankAccounts", Collections.emptyList());
+        body.put("assetType", "MUTUALFUND");
+        body.put("isLienMarkingMocked", true);
+        if (holdings != null && !holdings.isEmpty()) {
+            body.put("holdings", holdings);
+            body.put("isCombinedCASAvailable", true);
+            body.put("holdingsLastFetchedAt", Instant.now().toString());
+        }
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 

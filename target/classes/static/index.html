@@ -503,6 +503,7 @@
   const submitBtn = document.getElementById('submitBtn');
   const resultEl = document.getElementById('result');
 
+
   // ── Default holdings prefill ──
   const DEFAULT_HOLDINGS = [
     {
@@ -686,6 +687,56 @@
       </div>`;
   }
 
+  // ── Confirm Offer: call Unity staging API directly ──
+  async function callConfirmOffer(pan, phone, lender, holdings) {
+    const payload = {
+      pan: pan,
+      testMeta: { lender: lender },
+      productType: 'lamf',
+      authContact: { number: phone, countryCode: '+91' },
+      smallcaseContext: {
+        broker: 'kite',
+        isInternalUser: true,
+        isSubscribed: false,
+        isInvested: false,
+        analyticsId: 'ct12345678',
+      },
+      contacts: [
+        {
+          type: 'PHONE',
+          phone: { number: phone, countryCode: '+91' },
+          isVerified: true,
+          isPrimary: true,
+        },
+      ],
+      assetType: 'MUTUALFUND',
+      holdings: holdings && holdings.length ? holdings : null,
+      holdingsLastFetchedAt: new Date().toISOString(),
+      isLienMarkingMocked: true,
+      age: 24,
+      isNri: false,
+    };
+
+    const res = await fetch('/api/proxy/unity/create-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const json = await res.json();
+    if (!res.ok || !json.data) {
+      const msg = json.errors?.[0]?.message || json.message || 'Unity API error';
+      throw new Error(msg);
+    }
+    return {
+      success: true,
+      userId: json.data.unityUserId,
+      loanId: null,
+      journeyStatus: 'CONFIRM_OFFER',
+      lender: json.data.lender || lender,
+    };
+  }
+
   // ── Form submit ──
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
@@ -698,29 +749,31 @@
     const holdings       = JSON.parse(document.getElementById('holdings').value.trim());
     const transactionId  = document.getElementById('transactionId').value.trim() || undefined;
 
-    // Loading state
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span class="spinner"></span>Searching...';
     resultEl.className = '';
     resultEl.innerHTML = '';
 
     try {
-      const payload = { pan, phone, lender, journeyStatus: status, holdings };
-      if (transactionId) payload.transactionId = transactionId;
-
-      const res = await fetch('/api/user-journey', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        renderSuccess(data);
+      let data;
+      if (status === 'CONFIRM_OFFER') {
+        data = await callConfirmOffer(pan, phone, lender, holdings);
       } else {
-        renderError(data.message || 'Unknown error occurred');
+        const payload = { pan, phone, lender, journeyStatus: status, holdings };
+        if (transactionId) payload.transactionId = transactionId;
+
+        const res = await fetch('/api/user-journey', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        data = await res.json();
+        if (!res.ok || !data.success) {
+          renderError(data.message || 'Unknown error occurred');
+          return;
+        }
       }
+      renderSuccess(data);
     } catch (err) {
       renderError('Network error: ' + err.message);
     } finally {

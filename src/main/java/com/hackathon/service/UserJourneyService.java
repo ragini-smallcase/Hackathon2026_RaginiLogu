@@ -21,10 +21,11 @@ public class UserJourneyService {
                     request.getPan(),
                     request.getPhone(),
                     request.getLender(),
-                    request.getDob()
+                    request.getDob(),
+                    request.getHoldings()
             );
 
-            if (userId == null || userId.isBlank()) {
+            if (userId == null || userId.trim().isEmpty()) {
                 return UserJourneyResponse.error("Failed to create/retrieve Unity user");
             }
 

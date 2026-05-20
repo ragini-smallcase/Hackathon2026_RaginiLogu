@@ -109,7 +109,7 @@
       letter-spacing: 0.2px;
     }
 
-    label .required {
+    label .required, .contacts-section-label .required {
       color: #e94560;
       margin-left: 2px;
     }
@@ -609,7 +609,7 @@
 
           <div class="form-row">
             <div class="form-group">
-              <label for="bankAccountNumber">Bank Account Number <span class="required">*</span></label>
+              <label for="bankAccountNumber">Bank Account Number <span class="required" id="bankAccountNumber-required">*</span></label>
               <input
                 type="text"
                 id="bankAccountNumber"
@@ -621,7 +621,7 @@
               <div class="field-error" id="bankAccountNumber-error">Bank account number is required</div>
             </div>
             <div class="form-group">
-              <label for="ifsc">IFSC Code <span class="required">*</span></label>
+              <label for="ifsc">IFSC Code <span class="required" id="ifsc-required">*</span></label>
               <input
                 type="text"
                 id="ifsc"
@@ -805,18 +805,26 @@
   }
 
   // ── Bank fields: enable/disable based on journey status ──
-  const BANK_REQUIRED_STATUSES = new Set(['LINK_BANK_ACCOUNT', 'PLEDGE_FUNDS', 'SIGN_AGREEMENT', 'VIDEO_KYC']);
+  // LINK_BANK_ACCOUNT / FETCH_CKYC / CONFIRM_OFFER: fields disabled, no asterisk
+  // PLEDGE_FUNDS, SIGN_AGREEMENT, VIDEO_KYC: fields enabled and required
+  const BANK_REQUIRED_STATUSES  = new Set(['PLEDGE_FUNDS', 'SIGN_AGREEMENT', 'VIDEO_KYC']);
+  const BANK_NO_ASTERISK_STATUSES = new Set(['LINK_BANK_ACCOUNT', 'FETCH_CKYC', 'CONFIRM_OFFER']);
 
   function updateBankFields() {
-    const required = BANK_REQUIRED_STATUSES.has(document.getElementById('journeyStatus').value);
+    const status   = document.getElementById('journeyStatus').value;
+    const required = BANK_REQUIRED_STATUSES.has(status);
+    const showStar = required;
     ['bankAccountNumber', 'ifsc'].forEach(id => {
-      const el = document.getElementById(id);
+      const el   = document.getElementById(id);
+      const star = document.getElementById(id + '-required');
       el.disabled = !required;
+      if (star) star.style.display = showStar ? '' : 'none';
       if (!required) { el.value = ''; showError(id, false); }
     });
   }
 
   document.getElementById('journeyStatus').addEventListener('change', updateBankFields);
+  updateBankFields();
 
   // ── Auto-uppercase PAN ──
   document.getElementById('pan').addEventListener('input', function() {
